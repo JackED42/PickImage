@@ -1,5 +1,6 @@
 package com.vansuita.pickimage.dialog;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -7,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.DialogFragment;
+import android.support.v4.app.Fragment;
 import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutCompat;
 import android.view.LayoutInflater;
@@ -26,6 +28,8 @@ import com.vansuita.pickimage.listeners.IPickClick;
 import com.vansuita.pickimage.listeners.IPickResult;
 import com.vansuita.pickimage.resolver.IntentResolver;
 import com.vansuita.pickimage.util.Util;
+
+import java.io.File;
 
 import static com.vansuita.pickimage.R.layout.dialog;
 
@@ -57,9 +61,9 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
 
     private Boolean validProviders = null;
 
-  private IPickResult onPickResult;
-  private IPickClick onClick;
-  private IPickCancel onPickCancel;
+    private IPickResult onPickResult;
+    private IPickClick onClick;
+    private IPickCancel onPickCancel;
 
 
     @Nullable
@@ -68,7 +72,7 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
         View view = inflater.inflate(dialog, null, false);
 
         onAttaching();
-        onInitialize();
+        onInitialize(savedInstanceState);
 
         if (isValidProviders()) {
             onBindViewsHolders(view);
@@ -100,7 +104,7 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
     }
 
 
-    protected void onInitialize() {
+    protected void onInitialize(Bundle savedInstanceState) {
         if (getDialog().getWindow() != null) {
             getDialog().getWindow().requestFeature(Window.FEATURE_NO_TITLE);
             getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
@@ -108,8 +112,16 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
 
         this.setup = (PickSetup) getArguments().getSerializable(SETUP_TAG);
         this.resolver = new IntentResolver(getActivity(), setup);
+        if (savedInstanceState != null) {
+            resolver.setFile((File) savedInstanceState.getSerializable("camera_file"));
+        }
     }
 
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putSerializable("camera_file", resolver.cameraFile());
+    }
 
     private boolean isValidProviders() {
         if (validProviders == null) {
@@ -158,10 +170,12 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
 
     private View.OnClickListener listener = new View.OnClickListener() {
         @Override
-    public void onClick(View view)
-     {
-      if (view.getId() == R.id.cancel) {
-                onPickCancel.onCancelClick();
+        public void onClick(View view)
+        {
+            if (view.getId() == R.id.cancel) {
+                if (onPickCancel != null) {
+                    onPickCancel.onCancelClick();
+                }
                 dismiss();
             } else {
                 if (view.getId() == R.id.camera) {
@@ -269,19 +283,31 @@ public abstract class PickImageBaseDialog extends DialogFragment implements IPic
     }
 
 
-  protected PickImageBaseDialog setOnPickCancel(IPickCancel onPickCancel)
-   {
-    this.onPickCancel = onPickCancel;
-    return this;
-   }
+    protected PickImageBaseDialog setOnPickCancel(IPickCancel onPickCancel)
+    {
+        this.onPickCancel = onPickCancel;
+        return this;
+    }
 
 
     protected AsyncImageResult getAsyncResult() {
         return new AsyncImageResult(resolver, setup).setOnFinish(new AsyncImageResult.OnFinish() {
             @Override
             public void onFinish(PickResult pickResult) {
-                if (onPickResult != null)
+                if (onPickResult != null) {
                     onPickResult.onPickResult(pickResult);
+                } else {
+                    Fragment parentFragment = getParentFragment();
+                    Activity activity = getActivity();
+                    if (parentFragment != null && (parentFragment instanceof IPickResult)) {
+                        ((IPickResult) getParentFragment())
+                                .onPickResult(pickResult);
+                    } else if (activity != null
+                            && activity instanceof IPickResult) {
+                        ((IPickResult) activity)
+                                .onPickResult(pickResult);
+                    }
+                }
 
                 dismissAllowingStateLoss();
             }

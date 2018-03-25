@@ -47,6 +47,10 @@ public class IntentResolver {
         this.setup = setup;
     }
 
+    public void setFile(File file) {
+        this.saveFile = file;
+    }
+
     private Intent loadSystemPackages(Intent intent) {
         List<ResolveInfo> resInfo = activity.getPackageManager().queryIntentActivities(intent, PackageManager.MATCH_SYSTEM_ONLY);
 
@@ -99,7 +103,7 @@ public class IntentResolver {
         }
     }
 
-    private File cameraFile() {
+    public File cameraFile() {
         if (saveFile != null) {
             return saveFile;
         }
